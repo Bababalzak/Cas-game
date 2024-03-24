@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAS Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f0f0;
+        }
+        .player {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+        .team1 { background-color: blue; }
+        .team2 { background-color: red; }
+    </style>
+</head>
+<body>
+
+<!-- Team 1 -->
+<div class="player team1" id="player1"></div>
+<!-- Add more players for Team 1 -->
+<!-- Repeat the div below for each player, changing the ID accordingly -->
+<!-- <div class="player team1" id="player2"></div> -->
+<!-- ... Repeat this for a total of 20 players -->
+
+<!-- Team 2 -->
+<div class="player team2" id="player21"></div>
+<!-- Add more players for Team 2 -->
+<!-- Repeat the div below for each player, changing the ID accordingly -->
+<!-- <div class="player team2" id="player22"></div> -->
+<!-- ... Repeat this for a total of 20 players -->
+
+<script>
+    const players = document.querySelectorAll('.player');
+    const teams = {
+        team1: ['player1'], // Add more player IDs for Team 1
+        team2: ['player21'] // Add more player IDs for Team 2
+    };
+    const teamStatus = {
+        team1: 20, // Number of players in Team 1
+        team2: 20  // Number of players in Team 2
+    };
+
+    // Move players
+    document.addEventListener('keydown', function(event) {
+        const speed = 5;
+        const keyCode = event.keyCode;
+        players.forEach(player => {
+            let playerX = parseInt(player.style.left) || 0;
+            let playerY = parseInt(player.style.top) || 0;
+            if (keyCode === 37) { // Left arrow key
+                playerX -= speed;
+            } else if (keyCode === 38) { // Up arrow key
+                playerY -= speed;
+            } else if (keyCode === 39) { // Right arrow key
+                playerX += speed;
+            } else if (keyCode === 40) { // Down arrow key
+                playerY += speed;
+            }
+            player.style.left = playerX + 'px';
+            player.style.top = playerY + 'px';
+        });
+    });
+
+    // Check collision with players
+    setInterval(function() {
+        Object.keys(teams).forEach(team => {
+            const teamPlayers = teams[team];
+            let alivePlayers = 0;
+            teamPlayers.forEach(playerId => {
+                const player = document.getElementById(playerId);
+                const playerRect = player.getBoundingClientRect();
+                let allDead = true;
+                players.forEach(otherPlayer => {
+                    if (teamPlayers.includes(otherPlayer.id)) return;
+                    const otherPlayerRect = otherPlayer.getBoundingClientRect();
+                    if (playerRect.left < otherPlayerRect.right && playerRect.right > otherPlayerRect.left &&
+                        playerRect.top < otherPlayerRect.bottom && playerRect.bottom > otherPlayerRect.top) {
+                        allDead = false;
+                        alivePlayers++;
+                    }
+                });
+                if (allDead) {
+                    teamStatus[team]--;
+                }
+            });
+            if (teamStatus[team] === 0) {
+                alert('Team ' + (team === 'team1' ? '2' : '1') + ' wins!');
+                location.reload(); // Restart the game
+            }
+        });
+    }, 100);
+</script>
+
+</body>
+</html>
