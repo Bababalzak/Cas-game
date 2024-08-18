@@ -3,116 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>iPhone Spel</title>
+    <title>3D Brawl Stars-like Game met 10 NPC's en Richtlijn</title>
     <style>
-        body {
+        body, html {
             margin: 0;
+            padding: 0;
             overflow: hidden;
-            position: relative; /* Nodig voor positionele elementen */
-            width: 100%;
-            height: 100%;
+            background-color: #f0f0f0;
         }
-        #player {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background-color: red;
-            z-index: 2; /* Zet speler boven op andere elementen */
+        canvas {
+            display: block;
         }
-        .bullet {
+        .joystick {
             position: absolute;
-            width: 5px;
-            height: 5px;
-            background-color: blue;
-            z-index: 1; /* Zet kogels achter de speler */
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 255, 0.5);
+        }
+        #left-joystick {
+            left: 20px;
+            bottom: 20px;
+            background-color: rgba(0, 0, 255, 0.7);
+        }
+        #right-joystick {
+            right: 20px;
+            bottom: 20px;
+            background-color: rgba(255, 0, 0, 0.7);
         }
     </style>
 </head>
 <body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="left-joystick" class="joystick"></div>
+    <div id="right-joystick" class="joystick"></div>
 
-<div id="player"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Basis Three.js setup
+        const canvas = document.getElementById("gameCanvas");
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas });
 
-<script>
-    const player = document.getElementById('player');
-    let playerX = 50;
-    let playerY = 50;
-    const bulletSpeed = 5;
-    let bullets = [];
-    let isGhostMode = false;
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-    function movePlayer(event) {
-        if (isGhostMode) return;
-        const speed = 5;
-        const keyCode = event.keyCode;
-        if (keyCode === 37) { // Left arrow key
-            playerX -= speed;
-        } else if (keyCode === 38) { // Up arrow key
-            playerY -= speed;
-        } else if (keyCode === 39) { // Right arrow key
-            playerX += speed;
-        } else if (keyCode === 40) { // Down arrow key
-            playerY += speed;
+        // Lichtinstellingen
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        // Speler (een eenvoudige kubus)
+        const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        scene.add(player);
+
+        // Vloer
+        const floorGeometry = new THREE.PlaneGeometry(100, 100);
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        // Camera positie
+        camera.position.z = 10;
+        camera.position.y = 5;
+        camera.lookAt(player.position);
+
+        // Joystick-logica
+        const leftJoystick = document.getElementById("left-joystick");
+        const rightJoystick = document.getElementById("right-joystick");
+
+        let leftJoystickData = { active: false, angle: 0 };
+        let rightJoystickData = { active: false, angle: 0 };
+
+        // Placeholder voor joystick events
+        leftJoystick.addEventListener("touchstart", () => leftJoystickData.active = true);
+        leftJoystick.addEventListener("touchend", () => leftJoystickData.active = false);
+
+        rightJoystick.addEventListener("touchstart", () => rightJoystickData.active = true);
+        rightJoystick.addEventListener("touchend", () => rightJoystickData.active = false);
+
+        // Richtlijn (witte doorzichtige lijn)
+        let aimLine;
+        function createAimLine() {
+            const material = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+            const points = [
+                new THREE.Vector3(0, 0, 0),
+                new THREE.Vector3(0, 0, 5)
+            ];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            aimLine = new THREE.Line(geometry, material);
+            scene.add(aimLine);
         }
-        checkBoundary(); // Check for boundary after each move
-        player.style.left = playerX + 'px';
-        player.style.top = playerY + 'px';
-    }
 
-    function shoot(event) {
-        const bullet = document.createElement('div');
-        bullet.classList.add('bullet');
-        bullet.style.left = playerX + 'px';
-        bullet.style.top = playerY + 'px';
-        document.body.appendChild(bullet);
-        bullets.push({ x: playerX, y: playerY });
-        if (!isGhostMode) {
-            findNearestPlayer(playerX, playerY); // Find nearest player only if not in ghost mode
+        createAimLine();
+
+        // Functie voor het bijwerken van de richtlijn
+        function updateAimLine(angle) {
+            if (aimLine) {
+                const length = 5;
+                aimLine.geometry.setFromPoints([
+                    new THREE.Vector3(player.position.x, player.position.y, player.position.z),
+                    new THREE.Vector3(
+                        player.position.x + Math.cos(angle) * length,
+                        player.position.y,
+                        player.position.z + Math.sin(angle) * length
+                    )
+                ]);
+            }
         }
-    }
 
-    function moveBullets() {
-        bullets.forEach((bullet, index) => {
-            bullet.y -= bulletSpeed;
-            const bulletElement = document.getElementsByClassName('bullet')[index];
-            bulletElement.style.top = bullet.y + 'px';
-        });
-    }
-
-    function checkBoundary() {
-        const bodyRect = document.body.getBoundingClientRect();
-        const playerRect = player.getBoundingClientRect();
-        if (playerRect.left < bodyRect.left) {
-            playerX = bodyRect.left;
+        // Functie voor het bewegen van de speler
+        function movePlayer(angle) {
+            const speed = 0.05;
+            player.position.x += Math.cos(angle) * speed;
+            player.position.z += Math.sin(angle) * speed;
         }
-        if (playerRect.top < bodyRect.top) {
-            playerY = bodyRect.top;
-        }
-        if (playerRect.right > bodyRect.right) {
-            playerX = bodyRect.right - playerRect.width;
-        }
-        if (playerRect.bottom > bodyRect.bottom) {
-            playerY = bodyRect.bottom - playerRect.height;
-        }
-    }
 
-    function findNearestPlayer(x, y) {
-        // Hier komt de logica om de dichtstbijzijnde speler te vinden en te raken
-        // Deze functie moet nog worden geïmplementeerd
-    }
+        // Functie voor het schieten van kogels
+        function shoot(angle) {
+            const bulletSpeed = 0.2;
+            const bulletGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+            const bulletMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 });
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
 
-    function toggleGhostMode() {
-        isGhostMode = !isGhostMode;
-        if (isGhostMode) {
-            player.style.opacity = 0.5; // Make player semi-transparent
-        } else {
-            player.style.opacity = 1; // Restore player opacity
+            bullet.position.set(player.position.x, player.position.y, player.position.z);
+            bullet.velocity = {
+                x: Math.cos(angle) * bulletSpeed,
+                z: Math.sin(angle) * bulletSpeed
+            };
+
+            scene.add(bullet);
+
+            bullets.push(bullet);
         }
-    }
 
-    document.addEventListener('keydown', movePlayer);
-    document.addEventListener('click', shoot);
-    document.addEventListener('dblclick', toggleGhostMode); // Double click to toggle ghost mode
-</script>
+        // NPC logica
+        const npcArray = [];
+        const bullets = [];
 
+        function spawnNPCs(count) {
+            for (let i = 0; i < count; i++) {
+                const npcGeometry = new THREE.BoxGeometry(1, 1, 1);
+                const npcMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+                const npc = new THREE.Mesh(npcGeometry, npcMaterial);
+                
+                // Willekeurige positie binnen een bepaald bereik
+                npc.position.set(Math.random() * 20 - 10, 0, Math.random() * 20 - 10);
+                npc.velocity = {
+                    x: (Math.random() - 0.5) * 0.02,
+                    z: (Math.random() - 0.5) * 0.02
+                };
+
+                scene.add(npc);
+                npcArray.push(npc);
+            }
+        }
+
+        // Spawn 10 NPC's aan het begin van elke ronde
+        spawnNPCs(10);
+
+        // Detecteer botsingen
+        function detectCollisions() {
+            bullets.forEach((bullet, bulletIndex) => {
+                npcArray.forEach((npc, npcIndex) => {
+                    const distance = bullet.position.distanceTo(npc.position);
+                    if (distance < 1) { // Botsingsdetectie met NPC
+                        // NPC is geraakt
+                        console.log("NPC geraakt!");
+                        scene.remove(bullet);
+                        scene.remove(npc);
+                        bullets.splice(bulletIndex, 1);
+                        npcArray.splice(npcIndex, 1);
+
+                        // Check of alle NPC's zijn vernietigd
+                        if (npcArray.length === 0) {
+                            console.log("Alle NPC's zijn vernietigd. Nieuwe ronde!");
+                            spawnNPCs(10); // Nieuwe ronde
+                        }
+                    }
+                });
+            });
+        }
+
+        // Beweeg NPC's
+        function moveNPCs() {
+            npcArray.forEach(npc => {
+                npc.position.x += npc.velocity.x;
+                npc.position.z += npc.velocity.z;
+
+                // Simpele grenzencontrole om NPC's binnen het speelveld te houden
+                if (npc.position.x > 10 || npc.position.x < -10) npc.velocity.x *= -1;
+                if (npc.position.z > 10 || npc.position.z < -10) npc.velocity.z *= -1;
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Beweeg speler als joystick actief is
+            if (leftJoystickData.active) {
+                movePlayer(leftJoystickData.angle);
+            }
+
+            // Schiet als de rechter joystick actief is
+            if (rightJoystickData.active) {
+                shoot(rightJoystickData.angle);
+                updateAimLine(rightJoystickData.angle); // Werk richtlijn bij
+            }
+
+            // Update kogels
+            bullets.forEach(bullet => {
+                bullet.position.x += bullet.velocity.x;
+                bullet.position.z += bullet.velocity.z;
+            });
+
+            // Beweeg NPC's
+            moveNPCs();
+
+            // Detecteer botsingen
+            detectCollisions();
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
 </body>
 </html>
